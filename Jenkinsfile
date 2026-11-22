@@ -52,7 +52,7 @@ pipeline {
                 -e AWS_ACCESS_KEY_ID \
                 -e AWS_SECRET_ACCESS_KEY \
                 -e AWS_DEFAULT_REGION="$AWS_REGION" \
-                amazon/aws-cli:2 \
+                public.ecr.aws/aws-cli/aws-cli:latest \
                 ecr get-login-password --region "$AWS_REGION"
             }
             ecr_password | docker login --username AWS --password-stdin "$ECR_REGISTRY"
@@ -89,7 +89,7 @@ pipeline {
                 -e AWS_ACCESS_KEY_ID \
                 -e AWS_SECRET_ACCESS_KEY \
                 -e AWS_DEFAULT_REGION="$AWS_REGION" \
-                amazon/aws-cli:2 \
+                public.ecr.aws/aws-cli/aws-cli:latest \
                 ecr get-login-password --region "$AWS_REGION"
             }
 
