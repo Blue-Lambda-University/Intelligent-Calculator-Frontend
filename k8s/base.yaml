@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: calculator-web, namespace: calculator-staging}
+spec:
+  replicas: 2
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: calculator-web}}
+  template:
+    metadata: {labels: {app: calculator-web}}
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/REPLACE_ORG/intelligent-calculator-web:REPLACE_TAG
+          ports: [{containerPort: 3000}]
+          env:
+            - name: API_INTERNAL_URL
+              value: http://calculator-api:8000
+          readinessProbe:
+            httpGet: {path: /, port: 3000}
+          livenessProbe:
+            httpGet: {path: /, port: 3000}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext: {allowPrivilegeEscalation: false, runAsNonRoot: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: calculator-web, namespace: calculator-staging}
+spec:
+  selector: {app: calculator-web}
+  ports: [{port: 80, targetPort: 3000}]
