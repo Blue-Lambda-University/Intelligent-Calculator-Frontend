@@ -3,8 +3,8 @@
 //                password is the secret access key. The key needs ECR push.
 //   prod-ssh-key SSH private key. Set the credential username to the prod login
 //                (ubuntu, or ec2-user on Amazon Linux). That user must be able to run Docker.
-// Optional Jenkins environment variable:
-//   API_INTERNAL_URL  Backend base URL reachable from the prod container.
+// The prod container always calls the API at http://calculator-backend:8000
+// on the shared Docker network named calculator.
 
 pipeline {
   agent { label 'docker-node-kubectl' }
@@ -37,7 +37,11 @@ pipeline {
       steps {
         sh '''#!/usr/bin/env bash
           set -euo pipefail
-          docker build -t "$IMAGE_SHA" -t "$IMAGE_LATEST" .    #
+          docker container prune -f
+          docker image prune -af
+          docker builder prune -af
+          df -h /
+          docker build -t "$IMAGE_SHA" -t "$IMAGE_LATEST" .
         '''
       }
     }
@@ -97,26 +101,23 @@ pipeline {
               "docker login --username AWS --password-stdin '$ECR_REGISTRY'"
 
             ssh "${SSH_OPTS[@]}" "$SSH_TARGET" \
-              "API_INTERNAL_URL=$(printf '%q' "${API_INTERNAL_URL:-}") IMAGE_SHA=$(printf '%q' "$IMAGE_SHA") IMAGE_LATEST=$(printf '%q' "$IMAGE_LATEST") CONTAINER_NAME=$(printf '%q' "$CONTAINER_NAME") HOST_PORT=$(printf '%q' "$HOST_PORT") ECR_REGISTRY=$(printf '%q' "$ECR_REGISTRY") bash -s" <<'REMOTE'
+              "IMAGE_SHA=$(printf '%q' "$IMAGE_SHA") IMAGE_LATEST=$(printf '%q' "$IMAGE_LATEST") CONTAINER_NAME=$(printf '%q' "$CONTAINER_NAME") HOST_PORT=$(printf '%q' "$HOST_PORT") ECR_REGISTRY=$(printf '%q' "$ECR_REGISTRY") bash -s" <<'REMOTE'
 set -euo pipefail
 trap 'docker logout "$ECR_REGISTRY" >/dev/null 2>&1 || true' EXIT
+docker container prune -f
+docker image prune -af
 docker pull "$IMAGE_SHA"
 docker pull "$IMAGE_LATEST"
+docker network create calculator >/dev/null 2>&1 || true
+docker network connect calculator calculator-backend >/dev/null 2>&1 || true
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-if [ -n "${API_INTERNAL_URL}" ]; then
-  docker run -d \
-    --name "$CONTAINER_NAME" \
-    --restart unless-stopped \
-    -p "${HOST_PORT}:3000" \
-    -e "API_INTERNAL_URL=${API_INTERNAL_URL}" \
-    "$IMAGE_SHA"
-else
-  docker run -d \
-    --name "$CONTAINER_NAME" \
-    --restart unless-stopped \
-    -p "${HOST_PORT}:3000" \
-    "$IMAGE_SHA"
-fi
+docker run -d \
+  --name "$CONTAINER_NAME" \
+  --network calculator \
+  --restart unless-stopped \
+  -p "${HOST_PORT}:3000" \
+  -e API_INTERNAL_URL=http://calculator-backend:8000 \
+  "$IMAGE_SHA"
 ok=0
 for _ in 1 2 3 4 5; do
   if curl -fsS "http://127.0.0.1:${HOST_PORT}/" >/dev/null; then
