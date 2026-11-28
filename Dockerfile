@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
 FROM node:22-alpine AS builder
+ARG NEXT_PUBLIC_TRACE_DATA_FLOW=0
+ENV NEXT_PUBLIC_TRACE_DATA_FLOW=$NEXT_PUBLIC_TRACE_DATA_FLOW
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
