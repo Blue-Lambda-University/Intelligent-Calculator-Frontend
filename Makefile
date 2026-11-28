@@ -44,7 +44,7 @@ run:
 	  echo "Replacing existing container $(CONTAINER)"; \
 	  docker rm -f "$(CONTAINER)"; \
 	fi
-	docker run -d --name "$(CONTAINER)" -p "127.0.0.1:$(PORT):3000" -e "API_INTERNAL_URL=$(DOCKER_API_URL)" "$(IMAGE)"
+	docker run --name "$(CONTAINER)" -p "127.0.0.1:$(PORT):3000" -e "API_INTERNAL_URL=$(DOCKER_API_URL)" "$(IMAGE)"
 
 up:
 	$(MAKE) build
