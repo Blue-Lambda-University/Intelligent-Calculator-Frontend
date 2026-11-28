@@ -30,11 +30,13 @@ export default function Home(){
  },[]);
  useEffect(()=>{void refresh()},[refresh]);
  const perform=async()=>{
+   if (process.env.NODE_ENV === 'development') console.log('[UI] Calculation submitted', { mode: tab, expression: tab === 'basic' ? expression : undefined, operation: tab === 'scientific' ? operation : undefined });
    setBusy(true);setError('');try {
      let response:Calculation;
      if(tab==='basic') response=await request('api/v1/calculate',{method:'POST',body:JSON.stringify({expression:expression.replaceAll('×','*').replaceAll('÷','/').replaceAll('−','-').replaceAll('%','/100')})});
      else if(tab==='scientific') response=await request('api/v1/scientific',{method:'POST',body:JSON.stringify({operation,value:Number(expression),second:Number(second),angle_mode:angle})});
      else response=await request('api/v1/ai/calculate',{method:'POST',body:JSON.stringify({prompt})});
+     if (process.env.NODE_ENV === 'development') console.log('[UI] Displaying result', { mode: response.mode, result: response.result });
      setResult(response);void refresh();
    }catch(e){setError(e instanceof Error?e.message:'Unexpected error')}finally{setBusy(false)}
  };
