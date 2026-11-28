@@ -12,15 +12,21 @@ async function proxy(req: NextRequest, context: { params: Promise<{path: string[
   }
   const target = new URL(pathValue,backend.endsWith('/')?backend:backend+'/');
   const sid = req.cookies.get('calculator_sid')?.value || crypto.randomUUID();
-  const headers = { 'Content-Type':'application/json', 'X-Session-ID':sid };
+  const incomingId = req.headers.get('X-Request-ID') || '';
+  const traceId = /^[a-zA-Z0-9-]{1,64}$/.test(incomingId) ? incomingId : crypto.randomUUID();
+  const debug = process.env.NODE_ENV === 'development' || process.env.TRACE_DATA_FLOW === '1';
+  const headers = { 'Content-Type':'application/json', 'X-Session-ID':sid, 'X-Request-ID':traceId };
+  if (debug) console.log('[NEXT PROXY → FASTAPI]', { traceId, method: req.method, path: pathValue });
   try {
     const upstream = await fetch(target,{method:req.method,headers,body:['POST','PUT','PATCH'].includes(req.method)?await req.text():undefined,cache:'no-store',signal:AbortSignal.timeout(12000)});
     const body=await upstream.text();
-    const response = new NextResponse(body,{status:upstream.status,headers:{'Content-Type':upstream.headers.get('content-type')||'application/json'}});
+    if (debug) console.log('[FASTAPI → NEXT PROXY]', { traceId, status: upstream.status });
+    const response = new NextResponse(body,{status:upstream.status,headers:{'Content-Type':upstream.headers.get('content-type')||'application/json', 'X-Request-ID':traceId}});
     if (!req.cookies.has('calculator_sid')) response.cookies.set('calculator_sid',sid,{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',path:'/',maxAge:60*60*24*7});
     return response;
   } catch {
-    return NextResponse.json({detail:'Backend is currently unavailable'},{status:503});
+    if (debug) console.log('[NEXT PROXY] Upstream unavailable', { traceId });
+    return NextResponse.json({detail:'Backend is currently unavailable'},{status:503,headers:{'X-Request-ID':traceId}});
   }
 }
 export {proxy as GET,proxy as POST,proxy as DELETE};
