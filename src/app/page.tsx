@@ -30,11 +30,13 @@ export default function Home(){
  },[]);
  useEffect(()=>{void refresh()},[refresh]);
  const perform=async()=>{
+   if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_TRACE_DATA_FLOW === '1') console.log('[UI] Calculation submitted', { mode: tab, expression: tab === 'basic' ? expression.slice(0, 256) : undefined, operation: tab === 'scientific' ? operation : undefined });
    setBusy(true);setError('');try {
      let response:Calculation;
      if(tab==='basic') response=await request('api/v1/calculate',{method:'POST',body:JSON.stringify({expression:expression.replaceAll('×','*').replaceAll('÷','/').replaceAll('−','-').replaceAll('%','/100')})});
      else if(tab==='scientific') response=await request('api/v1/scientific',{method:'POST',body:JSON.stringify({operation,value:Number(expression),second:Number(second),angle_mode:angle})});
      else response=await request('api/v1/ai/calculate',{method:'POST',body:JSON.stringify({prompt})});
+     if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_TRACE_DATA_FLOW === '1') console.log('[UI] Displaying result', { mode: response.mode, result: response.result });
      setResult(response);void refresh();
    }catch(e){setError(e instanceof Error?e.message:'Unexpected error')}finally{setBusy(false)}
  };
